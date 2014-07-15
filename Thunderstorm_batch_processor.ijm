@@ -1,25 +1,25 @@
 macro "ThunderSTORM batch processor" {
 
-// Batch processing with GUI for ThunderSTORM developed by Martin Ovesn√Ω, Pavel K≈ô√≠≈æek, Josef Borkovec, Zdenƒõk ≈†vindrych, and Guy M. Hagen
+// Batch processing with GUI for ThunderSTORM developed by Martin Ovesný, Pavel Křížek, Josef Borkovec, Zdeněk Švindrych, and Guy M. Hagen
 // at the Charles University in Prague. Source code available here: http://thunder-storm.googlecode.com
 //
-// version 2.1 28/06/2014
-// tested ThunderSTORM dev-2014-06-14-b1, ImageJ 2.0.0-rc-6/1.49b
+// version 2.2 15/07/2014
+// tested ThunderSTORM dev-2014-07-14-b1, ImageJ 2.0.0-rc-6/1.49b
 // some parts are based on Leica LIF Extractor macro by Christophe Leterrier
 //
-// 1.0 > Initial version
-// 1.1 > Building-up the filtering steps online through GUI
-// 1.2 > New log file, fixed a bug in creating the filter string, selection of output visualisation works now, more detection filters enabled, 3D options out
-// 1.3 > Default filtering string, possibility to choose the scaling of visualisation output
-// 1.4 > Code cleanup
-// 1.5 > Multimode analysis/filtering
-// 1.6 > Longer waiting pause after single step detection+filtering because of the unpredictable length of the 'merging' step and the subsequent high risk for crash (issue with Charlotte's data with >10^6 raw events)
-// 1.7 > Fix a bug in final image saving for lif files and added the possibility to save the drift correction graphs
-// 1.8 > Added the possibility to change the magnification for the drift correction by cross-correlation [reduce to 2 or 3 if drift correlation fails]
-// 1.9 > Bug fix (in the CSV re-analysing part)
+// 1.0 > Initial version.
+// 1.1 > Building-up the filtering steps online through GUI.
+// 1.2 > New log file, fixed a bug in creating the filter string, selection of output visualisation works now, more detection filters enabled, 3D options out.
+// 1.3 > Default filtering string, possibility to choose the scaling of visualisation output.
+// 1.4 > Code cleanup.
+// 1.5 > Multimode analysis/filtering.
+// 1.6 > Longer waiting pause after single step detection+filtering because of the unpredictable length of the 'merging' step and the subsequent high risk for crash (issue with Charlotte's data with >10^6 raw events).
+// 1.7 > Fix a bug in final image saving for lif files and added the possibility to save the drift correction graphs.
+// 1.8 > Added the possibility to change the magnification for the drift correction by cross-correlation [reduce to 2 or 3 if drift correlation fails].
+// 1.9 > Bug fix (in the CSV re-analysing part).
 // 2.0 > Modification of the pre-set parameters for detection. 
-// 2.1 > The parameters used for detection are now listed in the log file, 'remove duplicate' feature removed because we don‚Äôt use the MFA algorithm. Changed the default filtering string following suggestions to remove the upper boundary of sigma
-
+// 2.1 > The parameters used for detection are now listed in the log file, 'remove duplicate' feature removed because we don't use the MFA algorithm. Changed the default filtering string following suggestions to remove the upper boundary of sigma.
+// 2.2 > Better set of rules for recognition of GSD stacks within .lif files (avoid loading dodgy stacks or 'pumping' stacks) and improvement of the info displayed in the log file. Export the chi2 value if LSQ fitting selected.
 
 
 // Precautionary measures...
@@ -28,9 +28,9 @@ macro "ThunderSTORM batch processor" {
 
 // Initialise variables
 
-	current_version_script = "v2.1";
+	current_version_script = "v2.2";
 	connectivity_array = newArray("4-neighbourhood", "8-neighbourhood");
-	method_array = newArray("Least squares","Maximum likelihood");
+	method_array = newArray("Least squares","Weighted Least squares","Maximum likelihood");
 	save_array = newArray("In the source folder", "In a subfolder of the source folder", "In a folder next to the source folder", "Somewhere else");
 	visualisation_array = newArray("Averaged shifted histograms (2D)", "Normalized Gaussian (2D)", "No visualization");
 	first_stack = 1;
@@ -52,9 +52,10 @@ macro "ThunderSTORM batch processor" {
 	Dialog.addMessage("");
 	Dialog.addMessage("Detection & post-processing (LIF files)");
 	Dialog.addMessage("- Same as above but directly from the lif files. You must have only one GSD series per .lif file.");
+	Dialog.addMessage("  This is a limitation of the Bio-Formats importer plugin for ImageJ/Fiji.");
 	Dialog.addMessage("");
 	Dialog.addMessage("Post-processing (CSV files)");
-	Dialog.addMessage("- Allows to filter the events of a CSV file (use your *all_events.csv files) using various parameters.");
+	Dialog.addMessage("- Allows to filter the events of a CSV file (use your *all_events.csv files) using different parameters.");
 	Dialog.addMessage("");
 	Dialog.addMessage("Visualisation (CSV files)");
 	Dialog.addMessage("- To plot new HR images from a data table supplied as a CSV file.");
@@ -107,7 +108,7 @@ macro "ThunderSTORM batch processor" {
 		Dialog.addChoice("Connectivity", connectivity_array, "8-neighbourhood");
 		Dialog.addMessage("Estimator: PSF: Integrated Gaussian");
 		Dialog.addNumber("           Fitting radius [px]", 5, 0, 25,"");
-		Dialog.addChoice("Method", method_array, "Least squares");
+		Dialog.addChoice("Method", method_array, "Weighted Least squares");
 		Dialog.addString("           Initial sigma [px]", 1.6, 25);
 		Dialog.addMessage("");
 		Dialog.addMessage("Post-processing:");
@@ -236,8 +237,8 @@ macro "ThunderSTORM batch processor" {
 
 	current_root_stack_name = replace(stacklist_all[n], '.tif', '');
 
-	run("Export results", "id=true frame=true sigma=true filepath=[" + output_dir + current_root_stack_name + "_allevents.csv] bkgstd=true " +
-		"intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true fileformat=[CSV (comma separated)]");
+	run("Export results", "filepath=[" + output_dir + current_root_stack_name + "_allevents.csv] fileformat=[CSV (comma separated)] " + 
+		"id=true frame=true sigma=true chi2=true bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true");
 
 	if(visualization_choice == "Averaged shifted histograms (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Averaged shifted histograms] magnification=" + magnification_scale + " colorizez=true shifts=2 threed=false");
@@ -286,8 +287,8 @@ macro "ThunderSTORM batch processor" {
 		wait(90000);
 	}		// End of merging step
 
-	run("Export results", "id=true frame=true sigma=true filepath=[" + output_dir + current_root_stack_name + "_" + extension_filtered_output + ".csv] " +
-		"bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true fileformat=[CSV (comma separated)]");
+	run("Export results", "filepath=[" + output_dir + current_root_stack_name + "_" + extension_filtered_output + ".csv] fileformat=[CSV (comma separated)] " + 
+		"id=true frame=true sigma=true chi2=true bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true");
 
 	wait(20000);
 
@@ -380,7 +381,7 @@ macro "ThunderSTORM batch processor" {
 		Dialog.addChoice("Connectivity", connectivity_array, "8-neighbourhood");
 		Dialog.addMessage("Estimator: PSF: Integrated Gaussian");
 		Dialog.addNumber("           Fitting radius [px]", 5, 0, 25,"");
-		Dialog.addChoice("Method", method_array, "Least squares");
+		Dialog.addChoice("Method", method_array, "Weighted Least squares");
 		Dialog.addString("           Initial sigma [px]", 1.6, 25);
 		Dialog.addMessage("");
 		Dialog.addMessage("Post-processing:");
@@ -529,8 +530,8 @@ macro "ThunderSTORM batch processor" {
 	"estimator=[PSF: Integrated Gaussian] sigma=" + fitting_initial_sigma + " method=[" + fitting_method + "] " +
 	"full_image_fitting=false fitradius=" + fitting_radius + " mfaenabled=false renderer=[No Renderer]");
 
-	run("Export results", "id=true frame=true sigma=true filepath=[" + output_dir + new_stack_name + "_allevents.csv] bkgstd=true " +
-		"intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true fileformat=[CSV (comma separated)]");
+	run("Export results", "filepath=[" + output_dir + new_stack_name + "_allevents.csv] fileformat=[CSV (comma separated)] " + 
+		"id=true frame=true sigma=true chi2=true bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true");
 
 	if(visualization_choice == "Averaged shifted histograms (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Averaged shifted histograms] magnification=" + magnification_scale + " colorizez=true shifts=2 threed=false");
@@ -579,8 +580,8 @@ macro "ThunderSTORM batch processor" {
 		wait(90000);
 	}		// End of merging step
 
-	run("Export results", "id=true frame=true sigma=true filepath=[" + output_dir + new_stack_name + "_" + extension_filtered_output + ".csv] " +
-		"bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true fileformat=[CSV (comma separated)]");
+	run("Export results", "filepath=[" + output_dir + new_stack_name + "_" + extension_filtered_output + ".csv] fileformat=[CSV (comma separated)] " + 
+		"id=true frame=true sigma=true chi2=true bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true");
 
 	wait(20000);
 
@@ -672,7 +673,7 @@ macro "ThunderSTORM batch processor" {
 		Dialog.addMessage("");
 		Dialog.addCheckbox("Drift correction by cross-correlation", false);
 		Dialog.addNumber("           Number of bins:", 5, 0, 25,"");
-		Dialog.addNumber("            Magnification:", 5, 0, 25,"");
+		Dialog.addNumber("            Magnification:", 3, 0, 25,"");
 		Dialog.addCheckbox("Save the drift correction plot", true);
 		Dialog.addMessage("");
 		Dialog.addCheckbox("Merging", false);
@@ -798,8 +799,8 @@ macro "ThunderSTORM batch processor" {
 		wait(90000);
 	}		// End of merging step
 
-	run("Export results", "id=true frame=true sigma=true filepath=[" + output_dir + current_root_file_name + "_" + extension_filtered_output + ".csv] " +
-		"bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true fileformat=[CSV (comma separated)]");
+	run("Export results", "filepath=[" + output_dir + current_root_file_name + "_" + extension_filtered_output + ".csv] fileformat=[CSV (comma separated)] " + 
+		"id=true frame=true sigma=true chi2=true bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true");
 
 	wait(20000);
 
