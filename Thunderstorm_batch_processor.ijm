@@ -34,6 +34,7 @@ macro "ThunderSTORM batch processor" {
 	save_array = newArray("In the source folder", "In a subfolder of the source folder", "In a folder next to the source folder", "Somewhere else");
 	visualisation_array = newArray("Averaged shifted histograms (2D)", "Normalized Gaussian (2D)", "No visualization");
 	first_stack = 1;
+	progression_index = 0;
 
 // Initial GUI to select between analysis and/or filtering modes
 
@@ -51,7 +52,7 @@ macro "ThunderSTORM batch processor" {
 	Dialog.addMessage("  Detection will be carried out using the recommanded method but you can change the settings (see lab's wiki).");
 	Dialog.addMessage("");
 	Dialog.addMessage("Detection & post-processing (LIF files)");
-	Dialog.addMessage("- Same as above but directly from the lif files. You must have only one GSD series per .lif file.");
+	Dialog.addMessage("- Same as above but directly from the Leica lif files. You must have only one GSD series per lif file.");
 	Dialog.addMessage("  This is a limitation of the Bio-Formats importer plugin for ImageJ/Fiji.");
 	Dialog.addMessage("");
 	Dialog.addMessage("Post-processing (CSV files)");
@@ -224,7 +225,9 @@ macro "ThunderSTORM batch processor" {
 
 	open(file_path);
 
-	print(f1,"\nFile: " + stacklist_all[n] + " --> loaded.\n");
+	progression_index++;
+
+	print(f1,"\nFile " + progression_index + " out of " + number_of_tif + ": " + stacklist_all[n] + " --> loaded.\n");
 
 	print(f1,"File: " + stacklist_all[n] + " --> detection in progress...\n");
 
@@ -521,7 +524,9 @@ macro "ThunderSTORM batch processor" {
 	selectWindow(old_stack_name);										// Call the opened stack
 	rename(new_stack_name);												// Rename with the lif-free name
 
-	print(f1,"\nFile: " + stacklist_all[n] + " with " + series_count + " series. Loaded series: " + series_names[i] + " with " + series_frames + " frames.\n");
+	progression_index++;
+
+	print(f1,"\nFile " + progression_index + " out of " + number_of_lif + ": " + stacklist_all[n] + " with " + series_count + " series. Loaded series: " + series_names[i] + " with " + series_frames + " frames.\n");
 
 	print(f1,"File: " + new_stack_name + " --> detection in progress...\n");
 
