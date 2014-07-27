@@ -140,7 +140,7 @@ macro "ThunderSTORM batch processor" {
 		Dialog.addNumber("           Number of dark frames:", 0, 0, 25,"");
 		Dialog.addMessage("");
 		Dialog.addMessage("Visualization:");
-		Dialog.addChoice("Select rendering method", visualisation_array, "Averaged shifted histograms (2D)");
+		Dialog.addChoice("Select rendering method", visualisation_array, "Normalized Gaussian (2D)");
 		Dialog.addNumber("           Magnification:", 10, 0, 25,"");
 		Dialog.addMessage("");
 		Dialog.addChoice("Save output", save_array, "In the source folder");
@@ -470,7 +470,7 @@ macro "ThunderSTORM batch processor" {
 		Dialog.addNumber("           Number of dark frames:", 0, 0, 25,"");
 		Dialog.addMessage("");
 		Dialog.addMessage("Visualization:");
-		Dialog.addChoice("Select rendering method", visualisation_array, "Averaged shifted histograms (2D)");
+		Dialog.addChoice("Select rendering method", visualisation_array, "Normalized Gaussian (2D)");
 		Dialog.addNumber("           Magnification:", 10, 0, 25,"");
 		Dialog.addMessage("");
 		Dialog.addChoice("Save output", save_array, "In the source folder");
@@ -593,8 +593,9 @@ macro "ThunderSTORM batch processor" {
 
 	criterionA = indexOf(series_names[i],"GSD");	// Analyse the naming of the series to find THE ONE
 	criterionB = indexOf(series_names[i],"_el_");	// Analyse the naming of the series to find THE ONE
+	criterionC = indexOf(series_names[i],"eventlist");	// Analyse the naming of the series to find THE ONE
 
-	if(criterionA != -1 && criterionB == -1) { // Load and analyse only the series that matches both criterions
+	if(criterionA == 0 && criterionB == -1 && criterionC == -1) { // Load and analyse only the series that matches all criterions
 
 		run("Bio-Formats Importer", "open=["+ file_path + "] view=[Standard ImageJ] stack_order=Default series_"+d2s(i+1,0));
 
@@ -614,9 +615,9 @@ macro "ThunderSTORM batch processor" {
 		
 	if(channel_warping == true) {
 
-		criterionC = indexOf(stacklist_all[n],channel_warping_keyword);	// Analyse the naming of the tif file to find if it contains the keyword for warping
+		criterionD = indexOf(stacklist_all[n],channel_warping_keyword);	// Analyse the naming of the tif file to find if it contains the keyword for warping
 
-		if(criterionC != -1) {
+		if(criterionD != -1) {
 			print(f1,"File: " + new_stack_name + " --> image warping in progress...\n");
 
 			run("MultiStackReg", "action_1=[Load Transformation File] file_1=" + transformation_file_path + " stack_2=None action_2=Ignore file_2=[] transformation=Affine");
@@ -631,9 +632,9 @@ macro "ThunderSTORM batch processor" {
 		
 	if(inverted_drift_correction == true) {
 
-		criterionD = indexOf(stacklist_all[n],inverted_drift_correction_keyword);	// Analyse the naming of the tif file to find if it contains the keyword for warping
+		criterionE = indexOf(stacklist_all[n],inverted_drift_correction_keyword);	// Analyse the naming of the tif file to find if it contains the keyword for warping
 
-		if(criterionD != -1) {
+		if(criterionE != -1) {
 			print(f1,"File: " + new_stack_name + " --> image inversion in progress...\n");
 			run("Reverse");
 			print(f1,"File: " + new_stack_name + " --> image inversion completed.\n");
@@ -806,7 +807,7 @@ macro "ThunderSTORM batch processor" {
 		Dialog.addMessage("");
 		Dialog.addMessage("Visualization:");
 		Dialog.addMessage("");
-		Dialog.addChoice("Select rendering method", visualisation_array, "Averaged shifted histograms (2D)");
+		Dialog.addChoice("Select rendering method", visualisation_array, "Normalized Gaussian (2D)");
 		Dialog.addNumber("           Magnification:", 10, 0, 25,"");
 		Dialog.addMessage("");
 		Dialog.addChoice("Save output", save_array, "In the source folder");
@@ -999,7 +1000,7 @@ macro "ThunderSTORM batch processor" {
 	Dialog.addMessage("Number of csv files detected: " + number_of_csv);
 	Dialog.addMessage("Visualization:");
 	Dialog.addMessage("");
-	Dialog.addChoice("Select rendering method", visualisation_array, "Averaged shifted histograms (2D)");
+	Dialog.addChoice("Select rendering method", visualisation_array, "Normalized Gaussian (2D)");
 	Dialog.addNumber("           Magnification:", 10, 0, 25,"");
 	Dialog.addMessage("");
 	Dialog.addChoice("Save output", save_array, "In the source folder");
