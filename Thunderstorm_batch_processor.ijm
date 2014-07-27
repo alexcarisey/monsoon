@@ -192,6 +192,7 @@ macro "ThunderSTORM batch processor" {
 		print(f1,"\n");
 		print(f1,"Source folder: " + datapaths + " contains " + number_of_tif + " stacks.\n");
 		if (channel_warping == true) { print(f1,"Image warping will be applied to the stacks with the keyword \"" + channel_warping_keyword + "\" using the transformation file " + transformation_file_path + ".\n"); }
+		if (inverted_drift_correction == true) { print(f1,"The stacks with the keyword \"" + inverted_drift_correction_keyword + "\" will be reversed before processing.\n"); }
 		print(f1,"Image filtering: Wavelet filter with order = " + wavelet_order + " and scale = " + wavelet_scale + ".\n");
 		print(f1,"Approximate localisation of molecules: Local maximum method with a peak intensity threshold of " + peak_threshold + " and a connectivity of " + connectivity + ".\n");
 		print(f1,"Sub-pixel localisation of molecules: PSF Integrated Gaussian method using " + fitting_method + " fitting with a fitting radius of " + fitting_radius + " px and an initial sigma of " + fitting_initial_sigma + " px.\n");
@@ -257,7 +258,7 @@ macro "ThunderSTORM batch processor" {
 
 	selectWindow(stacklist_all[n]);
 
-	// Apply the image warping if required, check that the keyword is found and add an extension to the output file
+	// Apply the image warping if required, check that the keyword is found
 		
 	if(channel_warping == true) {
 
@@ -269,6 +270,22 @@ macro "ThunderSTORM batch processor" {
 			print(f1,"File: " + stacklist_all[n] + " --> image warping completed.\n");
 		} else {
 			print(f1,"The keyword for image warping hasn't been found in this stack.\n");
+		}
+
+	}
+
+	// Apply the inversion of the stack if required, check that the keyword is found
+		
+	if(inverted_drift_correction == true) {
+
+		criterionD = indexOf(stacklist_all[n],inverted_drift_correction_keyword);	// Analyse the naming of the tif file to find if it contains the keyword for warping
+
+		if(criterionD != -1) {
+			print(f1,"File: " + stacklist_all[n] + " --> image inversion in progress...\n");
+			run("Reverse");
+			print(f1,"File: " + stacklist_all[n] + " --> image inversion completed.\n");
+		} else {
+			print(f1,"The keyword for image inversion hasn't been found in this stack.\n");
 		}
 
 	}
@@ -505,6 +522,7 @@ macro "ThunderSTORM batch processor" {
 		print(f1,"\n");
 		print(f1,"Source folder: " + datapaths + " contains " + number_of_lif + " stacks.\n");
 		if (channel_warping == true) { print(f1,"Image warping will be applied to all stacks with the keyword \"" + channel_warping_keyword + "\" using the transformation file " + transformation_file_path + ".\n"); }
+		if (inverted_drift_correction == true) { print(f1,"The stacks with the keyword \"" + inverted_drift_correction_keyword + "\" will be reversed before processing.\n"); }
 		print(f1,"Image filtering: Wavelet filter with order = " + wavelet_order + " and scale = " + wavelet_scale + ".\n");
 		print(f1,"Approximate localisation of molecules: Local maximum method with a peak intensity threshold of " + peak_threshold + " and a connectivity of " + connectivity + ".\n");
 		print(f1,"Sub-pixel localisation of molecules: PSF Integrated Gaussian method using " + fitting_method + " fitting with a fitting radius of " + fitting_radius + " px and an initial sigma of " + fitting_initial_sigma + " px.\n");
@@ -605,6 +623,22 @@ macro "ThunderSTORM batch processor" {
 			print(f1,"File: " + new_stack_name + " --> image warping completed.\n");
 		} else {
 			print(f1,"The keyword for image warping hasn't been found in this stack.\n");
+		}
+
+	}
+
+	// Apply the inversion of the stack if required, check that the keyword is found
+		
+	if(inverted_drift_correction == true) {
+
+		criterionD = indexOf(stacklist_all[n],inverted_drift_correction_keyword);	// Analyse the naming of the tif file to find if it contains the keyword for warping
+
+		if(criterionD != -1) {
+			print(f1,"File: " + new_stack_name + " --> image inversion in progress...\n");
+			run("Reverse");
+			print(f1,"File: " + new_stack_name + " --> image inversion completed.\n");
+		} else {
+			print(f1,"The keyword for image inversion hasn't been found in this stack.\n");
 		}
 
 	}
