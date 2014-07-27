@@ -3,8 +3,8 @@ macro "ThunderSTORM batch processor" {
 // Batch processing with GUI for ThunderSTORM developed by Martin Ovesný, Pavel Křížek, Josef Borkovec, Zdeněk Švindrych, and Guy M. Hagen
 // at the Charles University in Prague. Source code available here: http://thunder-storm.googlecode.com
 //
-// version 2.2 15/07/2014
-// tested ThunderSTORM dev-2014-07-14-b1, ImageJ 2.0.0-rc-6/1.49b
+// version 2.3 26/07/2014
+// tested ThunderSTORM dev-2014-07-15-b1, ImageJ 2.0.0-rc-6/1.49b
 // some parts are based on Leica LIF Extractor macro by Christophe Leterrier
 //
 // 1.0 > Initial version.
@@ -20,6 +20,7 @@ macro "ThunderSTORM batch processor" {
 // 2.0 > Modification of the pre-set parameters for detection. 
 // 2.1 > The parameters used for detection are now listed in the log file, 'remove duplicate' feature removed because we don't use the MFA algorithm. Changed the default filtering string following suggestions to remove the upper boundary of sigma.
 // 2.2 > Better set of rules for recognition of GSD stacks within .lif files (avoid loading dodgy stacks or 'pumping' stacks) and improvement of the info displayed in the log file. Export the chi2 value if LSQ fitting selected.
+// 2.3 > Additional functions for 2-colour imaging (chromatic aberration correction and reversing stacks for X-correlation).
 
 
 // Precautionary measures...
@@ -28,13 +29,16 @@ macro "ThunderSTORM batch processor" {
 
 // Initialise variables
 
-	current_version_script = "v2.2";
+	current_version_script = "v2.3";
 	connectivity_array = newArray("4-neighbourhood", "8-neighbourhood");
 	method_array = newArray("Least squares","Weighted Least squares","Maximum likelihood");
 	save_array = newArray("In the source folder", "In a subfolder of the source folder", "In a folder next to the source folder", "Somewhere else");
 	visualisation_array = newArray("Averaged shifted histograms (2D)", "Normalized Gaussian (2D)", "No visualization");
 	first_stack = 1;
 	progression_index = 0;
+	gui_twocolours = false;
+	channel_warping = false;
+	inverted_drift_correction = false;
 
 // Initial GUI to select between analysis and/or filtering modes
 
@@ -43,7 +47,8 @@ macro "ThunderSTORM batch processor" {
 	Dialog.create("ThunderSTORM Batch Processor");
 	Dialog.addMessage("ThunderSTORM Batch Processor " + current_version_script);
 	Dialog.addMessage("");
-	Dialog.addChoice("             Select the mode  ", gui_choice_list, "Detection & post-processing (TIF stacks)");
+	Dialog.addChoice("          Select the mode  ", gui_choice_list, "Detection & post-processing (TIF stacks)");
+	Dialog.addCheckbox("Enable 2-colour specific functions", false);
 	Dialog.addMessage("");
 	Dialog.addMessage("Help notes:");
 	Dialog.addMessage("");
@@ -60,10 +65,15 @@ macro "ThunderSTORM batch processor" {
 	Dialog.addMessage("");
 	Dialog.addMessage("Visualisation (CSV files)");
 	Dialog.addMessage("- To plot new HR images from a data table supplied as a CSV file.");
+	Dialog.addMessage("");
+	Dialog.addMessage("Enable 2-colour specific functions");
+	Dialog.addMessage("- For 2-colour imaging: allows to perform chromatic aberration correction using a transformation matrix");
+	Dialog.addMessage("  and inversion of the first stack acquired before performing drift correction to minimise artefactual shift.");
 
 	Dialog.show();
 
 	gui_choice = Dialog.getChoice();
+	gui_twocolours = Dialog.getCheckbox();
 
 // ----------------- MODE 1: DETECT AND FILTER FROM THE TIF STACKS ----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -99,7 +109,12 @@ macro "ThunderSTORM batch processor" {
 		Dialog.create("ThunderSTORM Batch Processor");
 		Dialog.addMessage("ThunderSTORM Batch Processor " + current_version_script + "");
 		Dialog.addMessage("Source folder: " + datapaths + " with " + number_of_tif + " tif stacks.");
-		Dialog.addMessage("");
+		if(gui_twocolours == true) {
+		Dialog.addCheckbox("Image warping [you will provide the transformation matrice in the next step]", true);
+		Dialog.addString("           Keyword for channel to warp:", "green", 25);
+		Dialog.addCheckbox("Inverted drift correction for 1st channel acquired", false);
+		Dialog.addString("           Keyword for channel to reverse:", "green", 25);
+		}
 		Dialog.addMessage("Detection parameters to use:");
 		Dialog.addMessage("Filter: Wavelet filter (B-Spline)");
 		Dialog.addNumber("           B-Spline order", 3, 0, 25,"");
@@ -133,6 +148,12 @@ macro "ThunderSTORM batch processor" {
 
 		Dialog.show();
 
+		if(gui_twocolours == true) {
+		channel_warping = Dialog.getCheckbox();
+		channel_warping_keyword = Dialog.getString();
+		inverted_drift_correction = Dialog.getCheckbox();
+		inverted_drift_correction_keyword = Dialog.getString();
+		}
 		wavelet_order = Dialog.getNumber();
 		wavelet_scale = Dialog.getNumber();
 		peak_threshold = Dialog.getString();
@@ -156,6 +177,10 @@ macro "ThunderSTORM batch processor" {
 		saving_location_choice = Dialog.getChoice();
 		extension_filtered_output = Dialog.getString();
 
+// Find the warp file
+
+	if (channel_warping == true) { transformation_file_path=File.openDialog("Select a warp file"); }
+
 // Create and populate information for the log file
 
 		f1 = "[Log_file]";
@@ -166,6 +191,7 @@ macro "ThunderSTORM batch processor" {
 		print(f1,"----------------------------------------------------------------------------------\n");
 		print(f1,"\n");
 		print(f1,"Source folder: " + datapaths + " contains " + number_of_tif + " stacks.\n");
+		if (channel_warping == true) { print(f1,"Image warping will be applied to the stacks with the keyword \"" + channel_warping_keyword + "\" using the transformation file " + transformation_file_path + ".\n"); }
 		print(f1,"Image filtering: Wavelet filter with order = " + wavelet_order + " and scale = " + wavelet_scale + ".\n");
 		print(f1,"Approximate localisation of molecules: Local maximum method with a peak intensity threshold of " + peak_threshold + " and a connectivity of " + connectivity + ".\n");
 		print(f1,"Sub-pixel localisation of molecules: PSF Integrated Gaussian method using " + fitting_method + " fitting with a fitting radius of " + fitting_radius + " px and an initial sigma of " + fitting_initial_sigma + " px.\n");
@@ -227,9 +253,29 @@ macro "ThunderSTORM batch processor" {
 
 	progression_index++;
 
-	print(f1,"\nFile " + progression_index + " out of " + number_of_tif + ": " + stacklist_all[n] + " --> loaded.\n");
+	print(f1,"\nFile " + progression_index + " out of " + number_of_tif + ": " + stacklist_all[n] + " loaded.\n");
+
+	selectWindow(stacklist_all[n]);
+
+	// Apply the image warping if required, check that the keyword is found and add an extension to the output file
+		
+	if(channel_warping == true) {
+
+		criterionC = indexOf(stacklist_all[n],channel_warping_keyword);	// Analyse the naming of the tif file to find if it contains the keyword for warping
+
+		if(criterionC != -1) {
+			print(f1,"File: " + stacklist_all[n] + " --> image warping in progress...\n");
+			run("MultiStackReg", "stack_1=[" + stacklist_all[n] + "] action_1=[Load Transformation File] file_1=" + transformation_file_path + " stack_2=None action_2=Ignore file_2=[] transformation=Affine");
+			print(f1,"File: " + stacklist_all[n] + " --> image warping completed.\n");
+		} else {
+			print(f1,"The keyword for image warping hasn't been found in this stack.\n");
+		}
+
+	}
 
 	print(f1,"File: " + stacklist_all[n] + " --> detection in progress...\n");
+
+	// ThunderSTORM detection run
 
 	selectWindow(stacklist_all[n]);
 
@@ -239,6 +285,8 @@ macro "ThunderSTORM batch processor" {
 	"full_image_fitting=false fitradius=" + fitting_radius + " mfaenabled=false renderer=[No Renderer]");
 
 	current_root_stack_name = replace(stacklist_all[n], '.tif', '');
+
+	run("Show results table");
 
 	run("Export results", "filepath=[" + output_dir + current_root_stack_name + "_allevents.csv] fileformat=[CSV (comma separated)] " + 
 		"id=true frame=true sigma=true chi2=true bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true");
@@ -374,7 +422,12 @@ macro "ThunderSTORM batch processor" {
 		Dialog.create("ThunderSTORM Batch Processor");
 		Dialog.addMessage("ThunderSTORM Batch Processor " + current_version_script);
 		Dialog.addMessage("Source folder: " + datapaths + " with " + number_of_lif + " lif files.");
-		Dialog.addMessage("");
+		if(gui_twocolours == true) {
+		Dialog.addCheckbox("Image warping [you will provide the transformation matrice in the next step]", true);
+		Dialog.addString("           Keyword for channel to warp:", "green", 25);
+		Dialog.addCheckbox("Inverted drift correction for 1st channel acquired", false);
+		Dialog.addString("           Keyword for channel to reverse:", "green", 25);
+		}
 		Dialog.addMessage("Detection parameters to use:");
 		Dialog.addMessage("Filter: Wavelet filter (B-Spline)");
 		Dialog.addNumber("           B-Spline order", 3, 0, 25,"");
@@ -408,6 +461,12 @@ macro "ThunderSTORM batch processor" {
 
 		Dialog.show();
 
+		if(gui_twocolours == true) {
+		channel_warping = Dialog.getCheckbox();
+		channel_warping_keyword = Dialog.getString();
+		inverted_drift_correction = Dialog.getCheckbox();
+		inverted_drift_correction_keyword = Dialog.getString();
+		}
 		wavelet_order = Dialog.getNumber();
 		wavelet_scale = Dialog.getNumber();
 		peak_threshold = Dialog.getString();
@@ -431,6 +490,10 @@ macro "ThunderSTORM batch processor" {
 		saving_location_choice = Dialog.getChoice();
 		extension_filtered_output = Dialog.getString();
 
+	// Find the warp file
+
+	if (channel_warping == true) { transformation_file_path=File.openDialog("Select a warp file"); }
+
 	// Create and populate information for the log file
 
 		f1 = "[Log_file]";
@@ -441,6 +504,7 @@ macro "ThunderSTORM batch processor" {
 		print(f1,"----------------------------------------------------------------------------------\n");
 		print(f1,"\n");
 		print(f1,"Source folder: " + datapaths + " contains " + number_of_lif + " stacks.\n");
+		if (channel_warping == true) { print(f1,"Image warping will be applied to all stacks with the keyword \"" + channel_warping_keyword + "\" using the transformation file " + transformation_file_path + ".\n"); }
 		print(f1,"Image filtering: Wavelet filter with order = " + wavelet_order + " and scale = " + wavelet_scale + ".\n");
 		print(f1,"Approximate localisation of molecules: Local maximum method with a peak intensity threshold of " + peak_threshold + " and a connectivity of " + connectivity + ".\n");
 		print(f1,"Sub-pixel localisation of molecules: PSF Integrated Gaussian method using " + fitting_method + " fitting with a fitting radius of " + fitting_radius + " px and an initial sigma of " + fitting_initial_sigma + " px.\n");
@@ -512,9 +576,9 @@ macro "ThunderSTORM batch processor" {
 	criterionA = indexOf(series_names[i],"GSD");	// Analyse the naming of the series to find THE ONE
 	criterionB = indexOf(series_names[i],"_el_");	// Analyse the naming of the series to find THE ONE
 
-	if(criterionA == 0 && criterionB == -1) { // Load and analyse only the series that matches both criterions
+	if(criterionA != -1 && criterionB == -1) { // Load and analyse only the series that matches both criterions
 
-		run("Bio-Formats Importer", "open=["+ file_path + "] view=[Standard ImageJ] stack_order=Default use_virtual_stack series_"+d2s(i+1,0));
+		run("Bio-Formats Importer", "open=["+ file_path + "] view=[Standard ImageJ] stack_order=Default series_"+d2s(i+1,0));
 
 	old_stack_name = stacklist_all[n] + " - " + series_names[i];		// Create the string to call the series stack that has just been loaded
 
@@ -528,12 +592,33 @@ macro "ThunderSTORM batch processor" {
 
 	print(f1,"\nFile " + progression_index + " out of " + number_of_lif + ": " + stacklist_all[n] + " with " + series_count + " series. Loaded series: " + series_names[i] + " with " + series_frames + " frames.\n");
 
+	// Apply the image warping if required, check that the keyword is found and add an extension to the output file
+		
+	if(channel_warping == true) {
+
+		criterionC = indexOf(stacklist_all[n],channel_warping_keyword);	// Analyse the naming of the tif file to find if it contains the keyword for warping
+
+		if(criterionC != -1) {
+			print(f1,"File: " + new_stack_name + " --> image warping in progress...\n");
+
+			run("MultiStackReg", "action_1=[Load Transformation File] file_1=" + transformation_file_path + " stack_2=None action_2=Ignore file_2=[] transformation=Affine");
+			print(f1,"File: " + new_stack_name + " --> image warping completed.\n");
+		} else {
+			print(f1,"The keyword for image warping hasn't been found in this stack.\n");
+		}
+
+	}
+
 	print(f1,"File: " + new_stack_name + " --> detection in progress...\n");
+
+	// ThunderSTORM detection run
 
 	run("Run analysis", "filter=[Wavelet filter (B-Spline)] scale="+ wavelet_scale + " order=" + wavelet_order + " " +
 	"detector=[Local maximum] connectivity=" + connectivity + " threshold=" + peak_threshold + " " +
 	"estimator=[PSF: Integrated Gaussian] sigma=" + fitting_initial_sigma + " method=[" + fitting_method + "] " +
 	"full_image_fitting=false fitradius=" + fitting_radius + " mfaenabled=false renderer=[No Renderer]");
+
+	run("Show results table");
 
 	run("Export results", "filepath=[" + output_dir + new_stack_name + "_allevents.csv] fileformat=[CSV (comma separated)] " + 
 		"id=true frame=true sigma=true chi2=true bkgstd=true intensity=true saveprotocol=true offset=true uncertainty=true y=true x=true");
