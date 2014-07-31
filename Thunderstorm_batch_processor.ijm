@@ -3,8 +3,8 @@ macro "ThunderSTORM batch processor" {
 // Batch processing with GUI for ThunderSTORM developed by Martin Ovesný, Pavel Křížek, Josef Borkovec, Zdeněk Švindrych, and Guy M. Hagen
 // at the Charles University in Prague. Source code available here: http://thunder-storm.googlecode.com
 //
-// version 2.3 26/07/2014
-// tested ThunderSTORM dev-2014-07-15-b1, ImageJ 2.0.0-rc-6/1.49b
+// version 2.4 31/07/2014
+// tested ThunderSTORM dev-2014-07-20-b1, ImageJ 2.0.0-rc-6/1.49d
 // some parts are based on Leica LIF Extractor macro by Christophe Leterrier
 //
 // 1.0 > Initial version.
@@ -21,7 +21,7 @@ macro "ThunderSTORM batch processor" {
 // 2.1 > The parameters used for detection are now listed in the log file, 'remove duplicate' feature removed because we don't use the MFA algorithm. Changed the default filtering string following suggestions to remove the upper boundary of sigma.
 // 2.2 > Better set of rules for recognition of GSD stacks within .lif files (avoid loading dodgy stacks or 'pumping' stacks) and improvement of the info displayed in the log file. Export the chi2 value if LSQ fitting selected.
 // 2.3 > Additional functions for 2-colour imaging (chromatic aberration correction and reversing stacks for X-correlation).
-
+// 2.4 > Add the possibility to save all the output images as 16-bit, ready for copy/paste in your favourite non-imaging capable software (Word, Powerpoint, ...)
 
 // Precautionary measures...
 
@@ -29,7 +29,7 @@ macro "ThunderSTORM batch processor" {
 
 // Initialise variables
 
-	current_version_script = "v2.3";
+	current_version_script = "v2.4";
 	connectivity_array = newArray("4-neighbourhood", "8-neighbourhood");
 	method_array = newArray("Least squares","Weighted Least squares","Maximum likelihood");
 	save_array = newArray("In the source folder", "In a subfolder of the source folder", "In a folder next to the source folder", "Somewhere else");
@@ -39,6 +39,7 @@ macro "ThunderSTORM batch processor" {
 	gui_twocolours = false;
 	channel_warping = false;
 	inverted_drift_correction = false;
+	gui_16bitoutput = true;
 
 // Initial GUI to select between analysis and/or filtering modes
 
@@ -49,12 +50,13 @@ macro "ThunderSTORM batch processor" {
 	Dialog.addMessage("");
 	Dialog.addChoice("          Select the mode  ", gui_choice_list, "Detection & post-processing (TIF stacks)");
 	Dialog.addCheckbox("Enable 2-colour specific functions", false);
+	Dialog.addCheckbox("Export all the images in 16-bit depth as well", true);
 	Dialog.addMessage("");
 	Dialog.addMessage("Help notes:");
 	Dialog.addMessage("");
 	Dialog.addMessage("Detection & post-processing (TIF stacks)");
 	Dialog.addMessage("- This mode allows the detection of molecules from tif stacks with or without subsequent filtering.");
-	Dialog.addMessage("  Detection will be carried out using the recommanded method but you can change the settings (see lab's wiki).");
+	Dialog.addMessage("  Detection will be carried out using the recommended method but you can change the settings (see lab's wiki).");
 	Dialog.addMessage("");
 	Dialog.addMessage("Detection & post-processing (LIF files)");
 	Dialog.addMessage("- Same as above but directly from the Leica lif files. You must have only one GSD series per lif file.");
@@ -74,6 +76,7 @@ macro "ThunderSTORM batch processor" {
 
 	gui_choice = Dialog.getChoice();
 	gui_twocolours = Dialog.getCheckbox();
+	gui_16bitoutput = Dialog.getCheckbox();
 
 // ----------------- MODE 1: DETECT AND FILTER FROM THE TIF STACKS ----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -312,14 +315,26 @@ macro "ThunderSTORM batch processor" {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Averaged shifted histograms] magnification=" + magnification_scale + " colorizez=true shifts=2 threed=false");
 		wait(5000);
 		saveAs("Tiff", output_dir + current_root_stack_name + "_allevents.tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + current_root_stack_name + "_allevents_16bit.tif");
+			close(current_root_stack_name + "_allevents_16bit.tif");
+		} else {
 		close(current_root_stack_name + "_allevents.tif");
+		}
 	}
 
 	if(visualization_choice == "Normalized Gaussian (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Normalized Gaussian] magnification=" + magnification_scale + " dxforce=false colorizez=true dx=20.0 threed=false");
 		wait(5000);
 		saveAs("Tiff", output_dir + current_root_stack_name + "_allevents.tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + current_root_stack_name + "_allevents_16bit.tif");
+			close(current_root_stack_name + "_allevents_16bit.tif");
+		} else {
 		close(current_root_stack_name + "_allevents.tif");
+		}
 	}
 
 	print(f1,"File: " + stacklist_all[n] + " --> detection completed.\n");
@@ -364,14 +379,26 @@ macro "ThunderSTORM batch processor" {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Averaged shifted histograms] magnification=" + magnification_scale + " colorizez=true shifts=2 threed=false");
 		wait(5000);
 		saveAs("Tiff", output_dir + current_root_stack_name + "_" + extension_filtered_output + ".tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + current_root_stack_name + "_" + extension_filtered_output + "_16bit.tif");
+			close(current_root_stack_name + "_" + extension_filtered_output + "_16bit.tif");
+		} else { 
 		close(current_root_stack_name + "_" + extension_filtered_output + ".tif");
+		}
 	}
 
 	if(visualization_choice == "Normalized Gaussian (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Normalized Gaussian] magnification=" + magnification_scale + " dxforce=false colorizez=true dx=20.0 threed=false");
 		wait(5000);
 		saveAs("Tiff", output_dir + current_root_stack_name + "_" + extension_filtered_output + ".tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + current_root_stack_name + "_" + extension_filtered_output + "_16bit.tif");
+			close(current_root_stack_name + "_" + extension_filtered_output + "_16bit.tif");
+		} else { 
 		close(current_root_stack_name + "_" + extension_filtered_output + ".tif");
+		}
 	}
 
 	print(f1,"File: " + stacklist_all[n] + " --> data filtering completed.\n");
@@ -662,14 +689,26 @@ macro "ThunderSTORM batch processor" {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Averaged shifted histograms] magnification=" + magnification_scale + " colorizez=true shifts=2 threed=false");
 		wait(5000);
 		saveAs("Tiff", output_dir + new_stack_name + "_allevents.tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + new_stack_name + "_allevents_16bit.tif");
+			close(new_stack_name + "_allevents_16bit.tif");
+		} else {
 		close(new_stack_name + "_allevents.tif");
+		}
 	}
 
 	if(visualization_choice == "Normalized Gaussian (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Normalized Gaussian] magnification=" + magnification_scale + " dxforce=false colorizez=true dx=20.0 threed=false");
 		wait(5000);
 		saveAs("Tiff", output_dir + new_stack_name + "_allevents.tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + new_stack_name + "_allevents_16bit.tif");
+			close(new_stack_name + "_allevents_16bit.tif");
+		} else {
 		close(new_stack_name + "_allevents.tif");
+		}
 	}
 
 	print(f1,"File: " + new_stack_name + " --> detection completed.\n");
@@ -714,14 +753,26 @@ macro "ThunderSTORM batch processor" {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Averaged shifted histograms] magnification=" + magnification_scale + " colorizez=true shifts=2 threed=false");
 		wait(5000);
 		saveAs("Tiff", output_dir + new_stack_name + "_" + extension_filtered_output + ".tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + new_stack_name + "_" + extension_filtered_output + "_16bit.tif");
+			close(new_stack_name + "_" + extension_filtered_output + "_16bit.tif");
+		} else {
 		close(new_stack_name + "_" + extension_filtered_output + ".tif");
+		}
 	}
 
 	if(visualization_choice == "Normalized Gaussian (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Normalized Gaussian] magnification=" + magnification_scale + " dxforce=false colorizez=true dx=20.0 threed=false");
 		wait(5000);
 		saveAs("Tiff", output_dir + new_stack_name + "_" + extension_filtered_output + ".tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + new_stack_name + "_" + extension_filtered_output + "_16bit.tif");
+			close(new_stack_name + "_" + extension_filtered_output + "_16bit.tif");
+		} else {
 		close(new_stack_name + "_" + extension_filtered_output + ".tif");
+		}
 	}
 
 	print(f1,"File: " + new_stack_name + " --> data filtering completed.\n");
@@ -932,13 +983,25 @@ macro "ThunderSTORM batch processor" {
 	if(visualization_choice == "Averaged shifted histograms (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Averaged shifted histograms] magnification=" + magnification_scale + " colorizez=true shifts=2 threed=false");
 		saveAs("Tiff", output_dir + current_root_file_name + "_" + extension_filtered_output + ".tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + current_root_file_name + "_" + extension_filtered_output + "_16bit.tif");
+			close(current_root_file_name + "_" + extension_filtered_output + "_16bit.tif");
+		} else { 
 		close(current_root_file_name + "_" + extension_filtered_output + ".tif");
+		}
 	}
 
 	if(visualization_choice == "Normalized Gaussian (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Normalized Gaussian] magnification=" + magnification_scale + " dxforce=false colorizez=true dx=20.0 threed=false");
 		saveAs("Tiff", output_dir + current_root_file_name + "_" + extension_filtered_output + ".tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + current_root_file_name + "_" + extension_filtered_output + "_16bit.tif");
+			close(current_root_file_name + "_" + extension_filtered_output + "_16bit.tif");
+		} else { 
 		close(current_root_file_name + "_" + extension_filtered_output + ".tif");
+		}
 	}
 
 	print(f1,"File " + current_root_file_name + "_" + extension_filtered_output + " analysed and saved.\n");
@@ -1076,13 +1139,25 @@ macro "ThunderSTORM batch processor" {
 	if(visualization_choice == "Averaged shifted histograms (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Averaged shifted histograms] magnification=" + magnification_scale + " colorizez=true shifts=2 threed=false");
 		saveAs("Tiff", output_dir + current_root_file_name + "_" + extension_filtered_output + ".tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + current_root_file_name + "_" + extension_filtered_output + "_16bit.tif");
+			close(current_root_file_name + "_" + extension_filtered_output + "_16bit.tif");
+		} else { 
 		close(current_root_file_name + "_" + extension_filtered_output + ".tif");
+		}
 	}
 
 	if(visualization_choice == "Normalized Gaussian (2D)") {
 		run("Visualization", "imleft=0 imtop=0 imwidth=180 imheight=180 renderer=[Normalized Gaussian] magnification=" + magnification_scale + " dxforce=false colorizez=true dx=20.0 threed=false");
 		saveAs("Tiff", output_dir + current_root_file_name + "_" + extension_filtered_output + ".tif");
+		if(gui_16bitoutput == true) {
+			run("16-bit");
+			saveAs("Tiff", output_dir + current_root_file_name + "_" + extension_filtered_output + "_16bit.tif");
+			close(current_root_file_name + "_" + extension_filtered_output + "_16bit.tif");
+		} else { 
 		close(current_root_file_name + "_" + extension_filtered_output + ".tif");
+		}
 	}
 
 	print(f1,"High resolution image from " + current_root_file_name + "_" + extension_filtered_output + " saved.\n");
