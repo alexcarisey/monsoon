@@ -96,6 +96,7 @@ for (n=0; n<number_of_lif_folders; n++) {
 
 	}
 
+}
 
 // Final message within the status bar
 
