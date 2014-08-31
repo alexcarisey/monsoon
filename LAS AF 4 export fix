@@ -1,0 +1,109 @@
+macro "LAS AF 4 export fix" {
+
+// LAS AF 4 export fix
+//
+// version 1.0 28/08/2014
+// tested with ImageJ 1.48v+
+//
+// 1.0 > initial version
+
+// Precautionary measures...
+
+requires("1.48m");
+
+// User input to select the folder that contains the stacks to analyse
+
+input_dir = getDirectory("Choose the top level directory");
+
+// Create an array with the name of the stacks to analyse
+
+list_of_lif_folders = getFileList(input_dir);
+number_of_lif_folders = lengthOf(list_of_lif_folders);
+
+// Count the number of lif folders
+
+if (number_of_lif_folders == 0) {
+	exit("This folder doesn't contain any sub directory!");
+}
+
+// Localise and create the output folder
+	
+output_dir = getDirectory("Choose the destination folder");
+
+// Set batch mode
+
+setBatchMode(true);
+
+// Create and populate information for the log file
+
+f1 = "["+"LAS_AF_4_export_fix"+"]";
+run("Text Window...", "name=" + f1 + " width=90 height=50");
+
+print(f1,"----------------------------------------------------------------------------------\n");
+print(f1,"LAS AF 4 export fix v1.0 - August 2014\n");
+print(f1,"----------------------------------------------------------------------------------\n");
+print(f1,"\n");
+print(f1,"Source folder : " + input_dir + "\n");
+print(f1,"Destination directory: " + output_dir + "\n");
+
+// Loop on the folders
+
+for (n=0; n<number_of_lif_folders; n++) {
+	
+	// Get the file path to the lif
+	
+	individual_lif_folder_path = input_dir + list_of_lif_folders[n];
+		
+	// Store components of the file name
+	
+	lif_name = File.getName(list_of_lif_folders[n]);
+	list_of_series_within_lif_folders = getFileList (individual_lif_folder_path);
+	number_of_series_in_the_lif = lengthOf(list_of_series_within_lif_folders);
+
+	print(f1,lif_name + "\n");
+	//print(f1,number_of_series_in_the_lif + "\n");
+
+	// Loop for each series
+
+	for (m=0; m<number_of_series_in_the_lif; m++) {
+	
+		// Get the file path to the lif
+	
+		individual_series_folder_path = individual_lif_folder_path + list_of_series_within_lif_folders[m];
+		//print(f1,individual_series_folder_path + "\n");
+
+		// Read some info
+
+		name_of_the_series_in_the_lif = File.getName(list_of_series_within_lif_folders[m]);
+		//print(f1,name_of_the_series_in_the_lif + "\n");
+		new_name = lif_name + " - " + name_of_the_series_in_the_lif;
+		print(f1,new_name + "\n");
+	
+		// Analyse the naming of the Series to find the GSD stacks
+
+		criterionA = indexOf(name_of_the_series_in_the_lif,"GSD");
+		criterionB = indexOf(name_of_the_series_in_the_lif,"_el_");
+
+		// Load the time series
+
+		if(criterionA == 0 && criterionB == -1) {
+
+			run("Image Sequence...", "open=[" + individual_series_folder_path + "] file=[" + name_of_the_series_in_the_lif + "] sort use");
+			output_path = output_dir + new_name + ".tif";
+			save(output_path);
+
+		}
+
+	}
+
+
+// Final message within the status bar
+
+showStatus("LAS AF 4 export fix has finished to export your files.");
+
+print(f1,"\n");
+print(f1,"----------------------------------------------------------------------------------\n");
+print(f1,"\n");
+print(f1,"LAS AF 4 export fix has finished to export your files.\n");
+
+}
